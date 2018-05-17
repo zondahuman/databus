@@ -40,6 +40,7 @@ import javax.management.ObjectName;
 import org.apache.log4j.Logger;
 
 import com.google.code.or.OpenReplicator;
+import com.linkedin.databus.core.DatabusRuntimeException;
 import com.linkedin.databus.core.DatabusThreadBase;
 import com.linkedin.databus.core.DbusEventBufferAppendable;
 import com.linkedin.databus.core.UnsupportedKeyException;
@@ -339,8 +340,7 @@ public class OpenReplicatorEventProducer extends AbstractEventProducer
       _or.setTransport(null);
       _or.setBinlogParser(null);
 
-      _log.info("Connecting to OpenReplicator " + _or.getUser() + "@" + _or.getHost() + ":" + _or.getPort() + "/"
-              + _or.getBinlogFileName() + "#" + _or.getBinlogPosition());
+      _log.info(String.format("Open Replicator starting from %s@%d", binlogFile, offset));
     }
 
     @Override
@@ -352,23 +352,11 @@ public class OpenReplicatorEventProducer extends AbstractEventProducer
       initOpenReplicator(_sinceScn);
       try
       {
-        boolean started = false;
-        while (!started) {
-          try {
-            _or.start();
-            started = true;
-          }
-          catch (Exception e) {
-            _log.error("Failed to start OpenReplicator: " + e);
-            _log.warn("Sleeping for 1000 ms");
-            Thread.sleep(1000);
-          }
-        }
+        _or.start();
         _orListener.start();
       } catch (Exception e)
       {
-        _log.error("failed to start open replicator: " + e.getMessage(), e);
-        return;
+        throw new DatabusRuntimeException("failed to start open replicator: " + e.getMessage(), e);
       }
 
       long lastConnectMs = System.currentTimeMillis();
@@ -413,7 +401,10 @@ public class OpenReplicatorEventProducer extends AbstractEventProducer
           try
           {
             //should stop orListener first to get the final maxScn used for init open replicator.
-            _orListener.shutdownAll();
+            if (_orListener.isAlive())
+            {
+              _orListener.shutdown();
+            }
             long maxScn = _maxSCNReaderWriter.getMaxScn();
             _startPrevScn.set(maxScn);
             initOpenReplicator(maxScn);
@@ -459,7 +450,10 @@ public class OpenReplicatorEventProducer extends AbstractEventProducer
           _log.error("failed to stop Open Replicator", e);
         }
       }
-      _orListener.shutdownAll();
+      if (_orListener.isAlive())
+      {
+        _orListener.shutdown();
+      }
 
       _log.info("Event Producer Thread done");
       doShutdownNotify();
@@ -472,7 +466,7 @@ public class OpenReplicatorEventProducer extends AbstractEventProducer
       try
       {
         addTxnToBuffer(txn);
-        _maxSCNReaderWriter.saveMaxScn(txn.getIgnoredSourceScn()!=-1 ? txn.getIgnoredSourceScn() : txn.getScn());
+        _maxSCNReaderWriter.saveMaxScn(txn.getScn());
       }
       catch (UnsupportedKeyException e)
       {
@@ -508,12 +502,6 @@ public class OpenReplicatorEventProducer extends AbstractEventProducer
         return;
       }
 
-      List<PerSourceTransaction> sources = txn.getOrderedPerSourceTransactions();
-      if (0 == sources.size()) {
-        _log.info("Ignoring txn: " + txn);
-        return;
-      }
-
       EventSourceStatistics globalStats = getSource(GLOBAL_SOURCE_ID).getStatisticsBean();
 
       _eventBuffer.startEvents();
@@ -522,7 +510,7 @@ public class OpenReplicatorEventProducer extends AbstractEventProducer
       long timestamp = txn.getTxnNanoTimestamp();
       List<EventReaderSummary> summaries = new ArrayList<EventReaderSummary>();
 
-      for (PerSourceTransaction t: sources )
+      for (PerSourceTransaction t: txn.getOrderedPerSourceTransactions() )
       {
         long startDbUpdatesMs = System.currentTimeMillis();
         short sourceId = (short)t.getSrcId();

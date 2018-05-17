@@ -33,7 +33,6 @@ import org.apache.log4j.Logger;
 import org.codehaus.jackson.map.ObjectMapper;
 import com.linkedin.databus.container.netty.HttpRelay;
 import com.linkedin.databus.core.data_model.LogicalSource;
-import com.linkedin.databus.core.util.CompressUtil;
 import com.linkedin.databus2.core.DatabusException;
 import com.linkedin.databus2.core.container.ChunkedWritableByteChannel;
 import com.linkedin.databus2.core.container.DatabusHttpHeaders;
@@ -192,15 +191,9 @@ public class RegisterRequestProcessor implements RequestProcessor
       {
         mapper.writeValue(out, registeredSources);
       }
-      String outStr = out.toString();
-      String compress = request.getParams().getProperty(DatabusHttpHeaders.PROTOCOL_COMPRESS_PARAM);
-      if ("true".equals(compress))
-      {
-        outStr = CompressUtil.compress(outStr);
-      }
 
       ChunkedWritableByteChannel responseContent = request.getResponseContent();
-      byte[] resultBytes = outStr.getBytes(Charset.defaultCharset());
+      byte[] resultBytes = out.toString().getBytes(Charset.defaultCharset());
       responseContent.addMetadata(DatabusHttpHeaders.DBUS_CLIENT_RELAY_PROTOCOL_VERSION_HDR,
                                   registerResponseProtocolVersion);
       responseContent.write(ByteBuffer.wrap(resultBytes));

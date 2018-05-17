@@ -19,9 +19,6 @@ package com.linkedin.databus2.schemas;
 */
 
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.avro.Schema;
 
 /**
@@ -33,14 +30,12 @@ public class VersionedSchema
   private final VersionedSchemaId _id;
 
   private final String _origSchemaStr;
-  private final List<Schema.Field> _pkFieldList;
 
   public VersionedSchema(VersionedSchemaId id, Schema s, String origSchemaStr)
   {
     _schema = s;
     _id = id;
     _origSchemaStr = origSchemaStr;
-    _pkFieldList = new ArrayList<Schema.Field>();
   }
 
   public VersionedSchema(String baseName, short id, Schema s, String origSchemaStr)
@@ -89,11 +84,6 @@ public class VersionedSchema
   public VersionedSchemaId getId()
   {
     return _id;
-  }
-  
-  public List<Schema.Field> getPkFieldList()
-  {
-	return _pkFieldList;
   }
 
   /**

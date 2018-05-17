@@ -16,8 +16,6 @@ dependencies {
   compile externalDependency.json
   compile externalDependency.log4j
   compile externalDependency.netty
-  compile externalDependency.c3p0
-  compile externalDependency.guava
 
   testCompile externalDependency.testng
   testCompile externalDependency.easymock
